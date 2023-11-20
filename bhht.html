@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf8">
+    <title>Notable People</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/nouislider@14.6.4/distribute/nouislider.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/nouislider@14.6.4/distribute/nouislider.min.js"></script>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/5.0.0-beta3/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; }
+        #filters {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1; /* this makes sure the filters appear above the map */
+/*            background: white;*/
+            color: violet;
+            padding: 10px;
+            border-radius: 3px;
+            border-color: black;
+        }
+        #filters select {
+            margin-bottom: 5px;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="filters" class="card shadow">
+        <div class="card-body">
+            <p>Birthplaces: blue, Visited places: black, Death places: red</p>
+
+
+            <h5 class="card-title">Filters</h5>
+            <hr>
+            <div class="form-group">
+                <label for="occupation-filter">Occupation</label>
+                <select class="form-control" id="occupation-filter">
+                    <option value="">All</option>
+                    <option value="Sports/Games">Sports/Games</option>
+                    <option value="Culture">Culture</option>
+                    <option value="Leadership">Leadership</option>
+                    <option value="Discovery/Science">Discovery/Science</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="form-group mt-3">
+                <label for="rank-filter">Rank Percentile</label>
+                <select class="form-control" id="rank-filter">
+                    <option value="">All</option>
+                    <option value="25th">25th percentile</option>
+                    <option value="50th">50th percentile</option>
+                    <option value="75th">75th percentile</option>
+                    <option value="100th">100th percentile</option>
+                </select>
+            </div>
+            <div class="form-group mt-3">
+                <label for="gender-filter">Gender</label>
+                <select class="form-control" id="gender-filter">
+                    <option value="">All</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                </select>
+            </div>
+            <div class="form-group mt-3">
+                <label for="birthyear-slider">Birth Year</label>
+                <div id="birthyear-slider"></div>
+                <p id="birthyear-range" class="mt-2 text-center"></p>
+            </div>
+            <div class="mt-3 text-center">
+                <button id="reset" class="btn btn-outline-primary">Reset birth year to default</button>
+            </div>
+        </div>
+        <p>For more visibility you may want to remove the names, points or lines. </p>
+        <p>Click it again to get back what you removed</p>
+        <button id="toggle-labels">Toggle Labels</button>
+        <button id="toggle-points">Toggle Points</button>
+        <button id="toggle-lines">Toggle Lines</button>
+
+        <div class="form-group mt-3">
+            <label for="name-filter">Search by Name</label>
+            <input type="text" class="form-control" id="name-filter" placeholder="Enter name">
+        </div>
+
+        <div class="form-group mt-3">
+            <label for="qcode-filter">Search by Wikidata code</label>
+            <input type="text" class="form-control" id="qcode-filter" placeholder="Enter individaul qcode">
+        </div>
+
+        <p>Select label. By default it is location name</p>
+        <select id="label-field" onchange="updateLabelField()">
+          <option value="lname" selected>Location Name</option>
+          <option value="name">Name</option>
+          <option value="gender">Gender</option>
+          <option value="year">Year</option>
+        </select>
+
+
+    </div>
+
+
+
+
+    <div id="map"></div>
+
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1IjoiZXRoaW8wOTQzIiwiYSI6ImNsaW02dHh4MzB5ejUzZWtkMGI2a3R1NWwifQ.vtkxhf9UqrFY-HFPSd-BbA';
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/ethio0943/clkci2640001j01po8m6lg1i1',
+            zoom: 2
+        });
+
+
+        // Define updateLabelField globally
+        function updateLabelField() {
+            const labelField = document.getElementById('label-field').value;
+            map.setLayoutProperty('vis_test3-label', 'text-field', ['to-string', ['get', labelField]]);
+        }
+
+        // Global filter state
+        let filterState = {
+            occupation: null,
+            rank: null,
+            gender: null,
+            birthyear: null
+        };
+
+        map.on('load', function () {
+
+            //... your code ...
+            map.addSource('vis_lines4', {
+                type: 'vector',
+                url: 'mapbox://ethio0943.clki91p9h02ir2anxuvxlykeq-7l5l6'
+            });
+
+            // death_test layer
+            map.addSource('vis_test3', {
+                type: 'vector',
+                url: 'mapbox://ethio0943.clkjffojq0pbp2jqn0s41xrpx-5ssy9'
+            });
+
+
+            map.addLayer({
+                'id': 'vis_lines4-lines',
+                'type': 'line',
+                'source': 'vis_lines4',
+                'source-layer': 'vis_lines4',
+                'paint': {
+                    'line-color': 'violet', // Use a semi-transparent red color for lines
+                    // Use a data-driven expression for line-width based on the 'percentile_category' field
+                    'line-width': [
+                        'match',
+                        ['get', 'rank'],
+                        '25th', 0.009,
+                        '50th', 0.09,
+                        '75th', 0.9,
+                        '100th', 1.5,
+                        0.09            // Default value (if 'percentile_category' doesn't match any case), line-width will be 0.09
+                    ]
+                }
+            });
+
+
+            map.addLayer({
+                'id': 'vis_test3-points',
+                'type': 'circle',
+                'source': 'vis_test3',
+                'source-layer': 'vis_test3',
+                'paint': {
+                    'circle-color': [
+                        'match',
+                        ['get', 'ltype'],
+                        'birth place', 'blue',
+                        'visited places', 'black',
+                        'death place', 'red',
+                        'orange'
+                    ],
+                    'circle-radius': [
+                        'interpolate', 
+                        ['linear'], 
+                        ['zoom'],
+
+                        0, ['match', ['get', 'rank'], 
+                            '25th', 2, 
+                            '50th', 3, 
+                            '75th', 4, 
+                            '100th', 5, 
+                            3],
+
+                        10, ['match', ['get', 'rank'], 
+                            '25th', 3, 
+                            '50th', 4, 
+                            '75th', 5, 
+                            '100th', 6, 
+                            4],
+
+                        22, ['match', ['get', 'rank'], 
+                            '25th', 4, 
+                            '50th', 5, 
+                            '75th', 6, 
+                            '100th', 7, 
+                            5]
+                    ],
+                    'circle-opacity': 0.6
+                }
+            });
+
+
+
+            map.addLayer({
+                'id': 'vis_test3-label',
+                'type': 'symbol',
+                'source': 'vis_test3',
+                'source-layer': 'vis_test3',
+                'layout': {
+                    'symbol-sort-key': ["get", "rank"],
+                    'text-field': ["to-string", ["get", "lname"]],
+                    'text-font': [
+                        "step",
+                        ["zoom"],
+                        [
+                            "step",
+                            ["get", "rank"],
+                            [
+                                "literal",
+                                [
+                                    "Open Sans ExtraBold",
+                                    "Arial Unicode MS Regular"
+                                ]
+                            ],
+                            100,
+                            [
+                                "literal",
+                                [
+                                    "Open Sans Bold",
+                                    "Arial Unicode MS Regular"
+                                ]
+                            ],
+                            1000,
+                            [
+                                "literal",
+                                [
+                                    "Open Sans SemiBold",
+                                    "Arial Unicode MS Regular"
+                                ]
+                            ],
+                            10000,
+                            [
+                                "literal",
+                                [
+                                    "Open Sans Regular",
+                                    "Arial Unicode MS Regular"
+                                ]
+                            ]
+                        ],
+                        22,
+                        [
+                            "step",
+                            ["get", "rank"],
+                            [
+                                "literal",
+                                [
+                                    "Open Sans ExtraBold",
+                                    "Arial Unicode MS Regular"
+                                ]
+                            ],
+                            250.5,
+                            [
+                                "literal",
+                                [
+                                    "Open Sans Bold",
+                                    "Arial Unicode MS Regular"
+                                ]
+                            ],
+                            500,
+                            [
+                                "literal",
+                                [
+                                    "Open Sans Regular",
+                                    "Arial Unicode MS Regular"
+                                ]
+                            ]
+                        ]
+                    ],
+                    'text-size': [
+                        "interpolate",
+                        ["linear"],
+                        ["zoom"],
+                        0,
+                        [
+                            "interpolate",
+                            ["exponential", 1.21],
+                            ["get", "sum"],
+                            9.152710914611816,
+                            7.5,
+                            41.76505661010742,
+                            11
+                        ],
+                        10,
+                        [
+                            "interpolate",
+                            ["exponential", 1.5],
+                            ["get", "sum"],
+                            9.152710914611816,
+                            12,
+                            35,
+                            20
+                        ]
+                    ],
+                },
+                'paint': {
+                    "text-color": "#202"
+                }
+            });
+
+
+      
+
+
+
+            // Create the noUiSlider
+            const birthyearSlider = noUiSlider.create(document.getElementById('birthyear-slider'), {
+                start: [-500, 2023], // default values, replace with your actual min and max
+                connect: true,
+                range: {
+                    'min': -500, // replace with your actual min birthyear
+                    'max': 2023  // replace with your actual max birthyear
+                }
+            });
+
+            birthyearSlider.on('change', function (values) {
+                filterState.birthyear = [+values[0], +values[1]];
+                updateFilters();
+            });
+
+            birthyearSlider.on('update', function (values) {
+                document.getElementById('birthyear-range').innerText = `Birth year range: ${values[0]} - ${values[1]}`;
+            });
+
+            document.getElementById('reset').addEventListener('click', function () {
+                filterState = {
+                    occupation: null,
+                    rank: null,
+                    gender: null,
+                    birthyear: null
+                };
+                updateFilters();
+                birthyearSlider.set([-500, 2023]); // reset to your actual min and max
+            });
+
+            function updateFilters() {
+                let filters = [];
+
+                if (filterState.occupation) {
+                    filters.push(['==', ['get', 'occupation'], filterState.occupation]);
+                }
+
+                if (filterState.rank) {
+                    filters.push(['==', ['get', 'rank'], filterState.rank]);
+                }
+
+                if (filterState.gender) {
+                    filters.push(['==', ['get', 'gender'], filterState.gender]);
+                }
+
+
+
+                if (filterState.birthyear) {
+                    filters.push([
+                        'all', 
+                        ['>=', ['to-number', ['get', 'birthyr']], filterState.birthyear[0]], 
+                        ['<=', ['to-number', ['get', 'birthyr']], filterState.birthyear[1]]
+                    ]);
+                }
+
+                // Add the name-based search filter
+                // const nameSearchValue = document.getElementById('name-filter').value.trim().toLowerCase();
+                // if (nameSearchValue !== '') {
+                //     filters.push(['match', ['downcase', ['get', 'name']], ['downcase', nameSearchValue], true, false]);
+                // }
+
+
+                // const nameSearchValue = document.getElementById('name-filter').value.trim().toLowerCase();
+                // if (nameSearchValue !== '') {
+                //     filters.push(['in', nameSearchValue, ['downcase', ['get', 'name']]]);
+                // }
+
+
+                const nameSearchValue = document.getElementById('name-filter').value.trim().toLowerCase();
+                    if (nameSearchValue !== '') {
+                        const names = nameSearchValue.split(',');
+                        const nameFilters = names.map(name => ['in', name.trim(), ['downcase', ['get', 'name']]]);
+                        if (nameFilters.length > 1) {
+                            nameFilters.unshift('any');
+                            filters.push(nameFilters);
+                        } else {
+                            filters.push(nameFilters[0]);
+                        }
+                    }
+
+                // Add the qcode-based search filter
+                // const qcodeSearchValue = document.getElementById('qcode-filter').value.trim().toLowerCase();
+                // if (qcodeSearchValue !== '') {
+                //     filters.push(['match', ['downcase', ['get', 'wikidata_code']], ['downcase', qcodeSearchValue], true, false]);
+                // }
+
+                const qcodeSearchValue = document.getElementById('qcode-filter').value.trim().toLowerCase();
+                    if (qcodeSearchValue !== '') {
+                        const qcodes = qcodeSearchValue.split(',');
+                        const qcodeFilters = qcodes.map(qcode => ['==', ['downcase', ['get', 'wikidata_code']], ['downcase', qcode.trim()]]);
+                        if (qcodeFilters.length > 1) {
+                            qcodeFilters.unshift('any');
+                            filters.push(qcodeFilters);
+                        } else {
+                            filters.push(qcodeFilters[0]);
+                        }
+                    }
+
+        
+      
+
+                if (filters.length > 0) {
+                    filters.unshift('all');
+                }
+
+                // Apply filters to all layers
+                map.setFilter('vis_test3-points', filters.length > 0 ? filters : null);
+                map.setFilter('vis_lines4-lines', filters.length > 0 ? filters : null);
+                map.setFilter('vis_test3-label', filters.length > 0 ? filters : null);
+            }
+
+            document.getElementById('occupation-filter').addEventListener('change', function() {
+                filterState.occupation = this.value || null;
+                updateFilters();
+            });
+
+            document.getElementById('rank-filter').addEventListener('change', function() {
+                filterState.rank = this.value || null;
+                updateFilters();
+            });
+
+            document.getElementById('gender-filter').addEventListener('change', function() {
+                filterState.gender = this.value || null;
+                updateFilters();
+            });
+
+            document.getElementById('name-filter').addEventListener('input', function() {
+                updateFilters();
+            });
+
+            document.getElementById('qcode-filter').addEventListener('input', function() {
+                updateFilters();
+            });
+
+
+
+            document.getElementById('toggle-labels').addEventListener('click', function() {
+                toggleVisibility('vis_test3-label');
+            });
+
+            document.getElementById('toggle-points').addEventListener('click', function() {
+                toggleVisibility('vis_test3-points');
+            });
+
+            document.getElementById('toggle-lines').addEventListener('click', function() {
+                toggleVisibility('vis_lines4-lines');
+            });
+
+            function toggleVisibility(layerId) {
+                var currentVisibility = map.getLayoutProperty(layerId, 'visibility');
+
+                if(currentVisibility === 'visible') {
+                    map.setLayoutProperty(layerId, 'visibility', 'none');
+                } else {
+                    map.setLayoutProperty(layerId, 'visibility', 'visible');
+                }
+            }
+
+
+            map.on('click', function(e) {
+                let features = map.queryRenderedFeatures(e.point, {
+                    layers: ['vis_test3-points', 'vis_lines4-lines','vis_test3-label'] // replace with your layer names
+                });
+
+                if (!features.length) {
+                    return;
+                }
+
+                let feature = features[0];
+
+    
+
+                let url = feature.properties.url.replace(/ /g, "_");
+
+                let popup = new mapboxgl.Popup({ offset: [0, -15] })
+                    .setLngLat(e.lngLat)
+                    .setHTML('<h3>' + feature.properties.name + '</h3><p>Occupation: ' + feature.properties.occupation + '</p><p>ID: ' + feature.properties.wikidata_code + '</p><p>Rank: ' + feature.properties.rank + '</p>'+'<p>Year: ' + feature.properties.year + '</p><p>URL: <a href="' + url + '">' + url + '</a></p>')
+                    .addTo(map);
+
+
+
+
+
+            });
+
+
+            // Add click event listener to the map
+            map.on('click', 'vis_test3-points', function (e) {
+                const coordinates = e.features[0].geometry.coordinates.slice(); // Get clicked point coordinates
+                const properties = e.features[0].properties; // Get clicked point properties (name, occupation, rank)
+
+                // Filter lines based on the clicked point's wikidata_code (unique identifier)
+                const filter = ['in', 'wikidata_code', properties.wikidata_code];
+
+                // Highlight the clicked point and connected lines
+                map.setFilter('vis_lines4-lines', filter);
+                map.setFilter('vis_test3-points', filter);
+                map.setFilter('vis_test3-label', filter);
+
+                // Show the information (name, occupation, rank) of the clicked point
+                showInfo(properties);
+
+                // Reset other points and lines to be less visible (blurred)
+                const allFilters = ['!in', 'wikidata_code', properties.wikidata_code];
+                map.setFilter('vis_lines4-lines', allFilters);
+                map.setFilter('vis_test3-points', allFilters);
+                map.setFilter('vis_test3-label', allFilters);
+            });
+
+            // Reset the filters and show all points and lines when the map is clicked on empty space
+            map.on('click', function (e) {
+                // map.setFilter('vis_lines4-lines', null);
+                // map.setFilter('vis_test2-points', null);
+                updateFilters(); // Update the filters based on global filter state
+                hideInfo();
+            });
+
+            function hideInfo() {
+                // Hide the information popup or any other UI element
+                // Replace 'info-popup' with the ID or class of your popup container
+                const popup = map.getPopup();
+                if (popup) {
+                    popup.remove();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
